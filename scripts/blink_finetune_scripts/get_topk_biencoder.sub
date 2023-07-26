@@ -1,0 +1,50 @@
+#!/bin/bash -l
+
+#SBATCH --job-name=get_topk_biencoder
+#SBATCH --output=get_topk_biencoder.out
+#SBATCH --nodes=1
+#SBATCH --partition=scads-a100
+#SBATCH --account=scads
+#SBATCH --gres=gpu:1
+#SBATCH --mem=128gb
+#SBATCH --time=5-00:00:0
+#SBATCH --cpus-per-task=10
+
+port=$(shuf -i 6000-9999 -n 1)
+USER=$(whoami)
+node=$(hostname -s)
+
+unset XDG_RUNTIME_DIR
+if [ "$SLURM_JOBTMP" != "" ]; then
+    export XDG_RUNTIME_DIR=$SLURM_JOBTMP
+fi
+
+### mintaka
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/biencoder/eval_biencoder.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/mintaka_modelv2/biencoder/epoch_1/pytorch_model.bin \
+    --data_path /ist-project/scads/nrl_inter/warisaraporn_inter/datasets/blink/mintaka \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/mintaka_modelv2 \
+    --encode_batch_size 8 --eval_batch_size 1 --top_k 100 --save_topk_result \
+    --bert_model bert-large-uncased --mode train,valid,test \
+    --cand_pool_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/entity_token_ids_128.t7 \
+    --cand_encode_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/all_entities_large.t7
+
+### webqsp
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/biencoder/eval_biencoder.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/webqsp_modelv2/biencoder/epoch_0/pytorch_model.bin \
+    --data_path /ist-project/scads/nrl_inter/warisaraporn_inter/datasets/blink/webqsp \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/webqsp_modelv2 \
+    --encode_batch_size 8 --eval_batch_size 1 --top_k 100 --save_topk_result \
+    --bert_model bert-large-uncased --mode train,valid,test \
+    --cand_pool_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/entity_token_ids_128.t7 \
+    --cand_encode_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/all_entities_large.t7
+
+### graphq
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/biencoder/eval_biencoder.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/graphq_modelv2/biencoder/epoch_0/pytorch_model.bin \
+    --data_path /ist-project/scads/nrl_inter/warisaraporn_inter/datasets/blink/graphq \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/graphq_modelv2 \
+    --encode_batch_size 8 --eval_batch_size 1 --top_k 100 --save_topk_result \
+    --bert_model bert-large-uncased --mode train,valid,test \
+    --cand_pool_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/entity_token_ids_128.t7 \
+    --cand_encode_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/all_entities_large.t7

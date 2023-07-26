@@ -1,0 +1,47 @@
+#!/bin/bash -l
+
+#SBATCH --job-name=ft_blink_crossencoder
+#SBATCH --output=ft_blink_crossencoder.out
+#SBATCH --nodes=1
+#SBATCH --partition=scads-a100
+#SBATCH --account=scads
+#SBATCH --gres=gpu:1
+#SBATCH --mem=128gb
+#SBATCH --time=5-00:00:0
+#SBATCH --cpus-per-task=10
+
+port=$(shuf -i 6000-9999 -n 1)
+USER=$(whoami)
+node=$(hostname -s)
+
+unset XDG_RUNTIME_DIR
+if [ "$SLURM_JOBTMP" != "" ]; then
+    export XDG_RUNTIME_DIR=$SLURM_JOBTMP
+fi
+
+### mintaka
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/crossencoder/train_cross.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/crossencoder_wiki_large.bin \
+    --data_path  /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/mintaka_modelv2/top100_candidates \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/mintaka_modelv2/crossencoder \
+    --learning_rate 1e-05 --num_train_epochs 10 --max_context_length 128 --max_cand_length 128 \
+    --train_batch_size 1 --eval_batch_size 1 --bert_model bert-large-uncased \
+    --type_optimization all_encoder_layers --add_linear
+
+### webqsp
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/crossencoder/train_cross.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/crossencoder_wiki_large.bin \
+    --data_path  /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/webqsp_modelv2/top64_candidates \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/webqsp_modelv2/crossencoder \
+    --learning_rate 1e-05 --num_train_epochs 10 --max_context_length 32 --max_cand_length 128 \
+    --train_batch_size 1 --eval_batch_size 1 --bert_model bert-large-uncased \
+    --type_optimization all_encoder_layers --add_linear
+
+### graphq
+CUDA_LAUNCH_BLOCKING=1 ~/.conda/envs/blink_slurm/bin/python blink/crossencoder/train_cross.py \
+    --path_to_model /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/models/crossencoder_wiki_large.bin \
+    --data_path  /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/graphq_modelv2/top64_candidates \
+    --output_path /ist-project/scads/nrl_inter/warisaraporn_inter/BLINK_slurm/blink_ft_modelsv2/graphq_modelv2/crossencoder \
+    --learning_rate 1e-05 --num_train_epochs 10 --max_context_length 32 --max_cand_length 128 \
+    --train_batch_size 1 --eval_batch_size 1 --bert_model bert-large-uncased \
+    --type_optimization all_encoder_layers --add_linear
