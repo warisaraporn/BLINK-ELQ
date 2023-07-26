@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 import blink.candidate_ranking.utils as utils
 
-
+### modified version of nn_prediction.py
 def get_topk_predictions(
     reranker,
     train_dataloader,
@@ -33,7 +33,7 @@ def get_topk_predictions(
     else:
         iter_ = tqdm(train_dataloader)
 
-    ### get entity 
+    ### create entity mapping between Wikipedia ID and local ID
     wikipedia_id2local_id = {}
     local_id2wikipedia_id = {}
     local_idx = 0
@@ -76,7 +76,7 @@ def get_topk_predictions(
 
         for i in range(context_input.size(0)):
             oid += 1
-            inds = indicies[i] ### indices = local_id
+            inds = indicies[i] ### local_id
 
             ### convert predicted topk entity from wikipedia_id to local_id
             label_local_id = wikipedia_id2local_id[label_wiki_ids[i].item()]

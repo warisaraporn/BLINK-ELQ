@@ -1,8 +1,8 @@
 import json
 from tqdm import tqdm
 
+### load all the 5903527 entities
 def load_entities():
-    ### load all the 5903527 entities
     title2id = {}
     id2title = {}
     id2text = {}
@@ -32,9 +32,9 @@ def load_entities():
     return title2id, id2title, id2text, wikipedia_id2local_id, local_id2wikipedia_id
 
 title2id, id2title, id2text, wikipedia_id2local_id, local_id2wikipedia_id = load_entities()
-    
-def prepare_mintaka(input_filepath, output_filepath):
 
+### convert mintaka data into the format of the BLINK model
+def prepare_mintaka(input_filepath, output_filepath):
     data = [json.loads(line) for line in open(input_filepath, 'r', encoding='utf-8')]
     all_entity_count = 0
     entity_not_in_KB = 0

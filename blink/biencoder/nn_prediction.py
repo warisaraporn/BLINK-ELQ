@@ -33,7 +33,7 @@ def get_topk_predictions(
     else:
         iter_ = tqdm(train_dataloader)
 
-    ### entity 
+    ### create entity mapping between Wikipedia ID and local ID
     wikipedia_id2local_id = {}
     local_id2wikipedia_id = {}
     local_idx = 0
@@ -92,7 +92,7 @@ def get_topk_predictions(
         old_src = src
         for i in range(context_input.size(0)):
             oid += 1
-            inds = indicies[i]
+            inds = indicies[i] ### local_id
 
             if srcs[i] != old_src:
                 src = srcs[i].item()
@@ -106,9 +106,9 @@ def get_topk_predictions(
                 inds = inds[0]
 
             pointer = -1
-            label_id = wikipedia_id2local_id[label_ids[i].item()]
+            local_id = wikipedia_id2local_id[label_ids[i].item()] ### convert from wikipedia_id to local_id
             for j in range(top_k):
-                if inds[j].item() == label_id:
+                if inds[j].item() == local_id:
                     pointer = j
                     break
             stats[src].add(pointer)

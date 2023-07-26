@@ -90,7 +90,6 @@ DATASETS = [
 ]
 
 raw_data = [
-    # "/workspace/datasets/aida_test.json", ### aida
     "/workspace/datasets/mintaka_test_data_el.json", ### mintaka
     "/workspace/datasets/webqsp_test_data_el.json", ### webqsp
     "/workspace/datasets/graphq_test_data_el.json", ### graphq
@@ -123,7 +122,7 @@ PARAMETERS = {
     "interactive": False,
     "entity_catalogue": "models/entity.jsonl",
     "entity_encoding": "models/all_entities_large.t7",
-    "output_path": "outputv2",
+    "output_path": "blink_output",
     "fast": False,
     "top_k": 100,
 }
