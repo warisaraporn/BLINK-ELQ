@@ -47,6 +47,14 @@ class CrossEncoderModule(torch.nn.Module):
             encoder_model = RobertaModel.from_pretrained(model_path)
         else:
             encoder_model = BertModel.from_pretrained(model_path)
+
+        ### save and load model from local for sever that has no internet
+        # print('*****Saving encoder model*****')
+        # encoder_model.save_pretrained('/workspace/BLINK/init_model/cross_encoder')
+
+        # print('*****Loading encoder model*****')
+        # encoder_model = BertModel.from_pretrained('/ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/init_model/cross_encoder')
+        
         encoder_model.resize_token_embeddings(len(tokenizer))
         self.encoder = BertEncoder(
             encoder_model,
@@ -78,6 +86,13 @@ class CrossEncoderRanker(torch.nn.Module):
             self.tokenizer = BertTokenizer.from_pretrained(
                 params["bert_model"], do_lower_case=params["lowercase"]
             )
+            
+        ### save and load model from local for sever that has no internet
+        # print('*****Saving tokenizer model*****')
+        # self.tokenizer.save_pretrained('/workspace/BLINK/init_model/cross_tokenizer')
+
+        # print('*****Loading tokenizer model*****')
+        # self.tokenizer = BertTokenizer.from_pretrained('/ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/init_model/cross_tokenizer')
 
         special_tokens_dict = {
             "additional_special_tokens": [

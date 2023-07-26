@@ -34,6 +34,17 @@ class BiEncoderModule(torch.nn.Module):
         super(BiEncoderModule, self).__init__()
         ctxt_bert = BertModel.from_pretrained(params["bert_model"])
         cand_bert = BertModel.from_pretrained(params['bert_model'])
+
+        ### save and load model from local for sever that has no internet
+        # print('*****Saving bi-encoder model*****')
+        # ctxt_bert.save_pretrained('/workspace/BLINK/init_model/biencoder/ctxt')
+        # cand_bert.save_pretrained('/workspace/BLINK/init_model/biencoder/cand')
+
+        # print('*****Loading bi-encoder model*****')
+        # ctxt_bert = BertModel.from_pretrained('/ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/init_model/biencoder/ctxt')
+        # cand_bert = BertModel.from_pretrained('/ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/init_model/biencoder/cand')
+
+
         self.context_encoder = BertEncoder(
             ctxt_bert,
             params["out_dim"],
@@ -85,6 +96,14 @@ class BiEncoderRanker(torch.nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained(
             params["bert_model"], do_lower_case=params["lowercase"]
         )
+
+        ### save and load model from local for sever that has no internet
+        # print('*****Saving tokenizer model*****')
+        # self.tokenizer.save_pretrained('/workspace/BLINK/init_model/biencoder_tokenizer')
+
+        # print('*****Loading tokenizer model*****')
+        # self.tokenizer = BertTokenizer.from_pretrained('/ist-project/scads/nrl_inter/warisaraporn_inter/BLINK/init_model/biencoder_tokenizer')
+
         # init model
         self.build_model()
         model_path = params.get("path_to_model", None)

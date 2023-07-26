@@ -11,7 +11,6 @@ import torch
 from tqdm import tqdm
 
 import blink.candidate_ranking.utils as utils
-from blink.biencoder.zeshel_utils import WORLDS, Stats
 
 
 def get_topk_predictions(
@@ -25,6 +24,7 @@ def get_topk_predictions(
     is_zeshel=False,
     save_predictions=False,
 ):
+    ### get model + data
     reranker.model.eval()
     device = reranker.device
     logger.info("Getting top %d predictions." % top_k)
@@ -33,13 +33,13 @@ def get_topk_predictions(
     else:
         iter_ = tqdm(train_dataloader)
 
-    ### entity 
+    ### get entity 
     wikipedia_id2local_id = {}
     local_id2wikipedia_id = {}
     local_idx = 0
-    with open("./models/entity.jsonl", "r") as fin:
+    with open("models/entity.jsonl", "r") as fin:
         lines = fin.readlines()
-        for line in tqdm(lines):
+        for line in lines:
             entity = json.loads(line)
 
             if "idx" in entity:
@@ -53,65 +53,40 @@ def get_topk_predictions(
                 wikipedia_id2local_id[wikipedia_id] = local_idx
                 local_id2wikipedia_id[local_idx] = wikipedia_id
             local_idx += 1
-
+    
     nn_context = []
     nn_candidates = []
     nn_labels = []
-    nn_worlds = []
-    stats = {}
-
-    if is_zeshel:
-        world_size = len(WORLDS)
-    else:
-        # only one domain
-        world_size = 1
-        candidate_pool = [candidate_pool]
-        cand_encode_list = [cand_encode_list]
-
-    logger.info("World size : %d" % world_size)
-
-    for i in range(world_size):
-        stats[i] = Stats(top_k)
+    num_pred_correct = 0
+    num_all_entity = 0
+    candidate_pool = candidate_pool.to(device)
     
     oid = 0
     for step, batch in enumerate(iter_):
         batch = tuple(t.to(device) for t in batch)
-        if is_zeshel:
-            context_input, _, srcs, label_ids = batch
-        else:
-            context_input, _, label_ids = batch
-            srcs = torch.tensor([0] * context_input.size(0), device=device)
+        context_input, _, label_wiki_ids = batch
+    
+        with torch.no_grad():
+            scores = reranker.score_candidate(
+                context_input, 
+                None, 
+                cand_encs=cand_encode_list.to(device)
+            )
+            _, indicies = scores.topk(top_k)
 
-        src = srcs[0].item()
-        scores = reranker.score_candidate(
-            context_input, 
-            None, 
-            cand_encs=cand_encode_list[src].to(device)
-        )
-        values, indicies = scores.topk(top_k)
-        old_src = src
         for i in range(context_input.size(0)):
             oid += 1
-            inds = indicies[i]
+            inds = indicies[i] ### indices = local_id
 
-            if srcs[i] != old_src:
-                src = srcs[i].item()
-                # not the same domain, need to re-do
-                new_scores = reranker.score_candidate(
-                    context_input[[i]], 
-                    None,
-                    cand_encs=cand_encode_list[src].to(device)
-                )
-                _, inds = new_scores.topk(top_k)
-                inds = inds[0]
+            ### convert predicted topk entity from wikipedia_id to local_id
+            label_local_id = wikipedia_id2local_id[label_wiki_ids[i].item()]
 
             pointer = -1
-            label_id = wikipedia_id2local_id[label_ids[i].item()]
-            for j in range(top_k):
-                if inds[j].item() == label_id:
-                    pointer = j
+            for t in range(top_k):
+                if inds[t].item() == label_local_id:
+                    num_pred_correct += 1
+                    pointer = t
                     break
-            stats[src].add(pointer)
 
             if pointer == -1:
                 continue
@@ -120,24 +95,12 @@ def get_topk_predictions(
                 continue
 
             # add examples in new_data
-            # cur_candidates = candidate_pool[src][inds]
-            cur_candidates = candidate_pool[srcs[i].item()].to(device)[inds]
+            cur_candidates = candidate_pool[inds]
             nn_context.append(context_input[i].cpu().tolist())
             nn_candidates.append(cur_candidates.cpu().tolist())
             nn_labels.append(pointer)
-            nn_worlds.append(src)
 
-    res = Stats(top_k)
-    for src in range(world_size):
-        if stats[src].cnt == 0:
-            continue
-        if is_zeshel:
-            logger.info("In world " + WORLDS[src])
-        output = stats[src].output()
-        logger.info(output)
-        res.extend(stats[src])
-
-    logger.info(res.output())
+        num_all_entity += context_input.size(0)
 
     nn_context = torch.LongTensor(nn_context)
     nn_candidates = torch.LongTensor(nn_candidates)
@@ -148,8 +111,7 @@ def get_topk_predictions(
         'labels': nn_labels,
     }
 
-    if is_zeshel:
-        nn_data["worlds"] = torch.LongTensor(nn_worlds)
+    logger.info("Recall@100: %d " % num_pred_correct/num_all_entity)
     
     return nn_data
 

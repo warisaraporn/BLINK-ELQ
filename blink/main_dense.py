@@ -240,8 +240,8 @@ def _run_biencoder(biencoder, dataloader, candidate_encoding, top_k=100, indexer
     nns = []
     all_scores = []
     for batch in tqdm(dataloader):
-        context_input, _, _,label_ids = batch
-        # context_input, _, label_ids = batch
+        # context_input, _, _,label_ids = batch
+        context_input, _, label_ids = batch
         with torch.no_grad():
             if indexer is not None:
                 context_encoding = biencoder.encode_context(context_input).numpy()
@@ -314,9 +314,19 @@ def load_models(args, logger=None):
         # load crossencoder model
         if logger:
             logger.info("loading crossencoder model")
-        with open(args.crossencoder_config) as json_file:
-            crossencoder_params = json.load(json_file)
-            crossencoder_params["path_to_model"] = args.crossencoder_model
+        try:
+            with open(args.crossencoder_config) as json_file:
+                crossencoder_params = json.load(json_file)
+        except json.decoder.JSONDecodeError:
+            with open(args.crossencoder_config) as json_file:
+                for line in json_file:
+                    line = line.replace("'", "\"")
+                    line = line.replace("True", "true")
+                    line = line.replace("False", "false")
+                    line = line.replace("None", "null")
+                    crossencoder_params = json.loads(line)
+                    break
+        crossencoder_params["path_to_model"] = args.crossencoder_model
         crossencoder = load_crossencoder(crossencoder_params)
 
     # load candidate entities
@@ -469,7 +479,23 @@ def run(
             biencoder_accuracy = -1
             recall_at = -1
             if not keep_all:
-                # get recall values
+                ### compute confusion matrix
+                gold_top1 = [gold[0] for gold in labels]
+                biencoder_pred_top1 = [pred[0] for pred in nns]
+                tp = 0
+                fp = 0
+                fn = 0
+                for gold, pred in zip(gold_top1, biencoder_pred_top1):
+                    if gold == pred:
+                        tp += 1
+                    else:
+                        fp += 1
+                        fn += 1
+                biencoder_precision = tp/(tp+fp)
+                biencoder_recall = tp/(tp+fn)
+                biencoder_f1 = (2*biencoder_precision*biencoder_recall)/(biencoder_precision+biencoder_recall)
+
+                # get recall@topk values
                 top_k = args.top_k
                 x = []
                 y = []
@@ -485,6 +511,12 @@ def run(
                 # plt.plot(x, y)
                 biencoder_accuracy = y[0]
                 recall_at = y[-1]
+
+                print(f'===len gold entity top@1=== {len(gold_top1)}')
+                print(f'===len predicted entity top@1=== {len(biencoder_pred_top1)}')
+                print(f'===biencoder precision=== {biencoder_precision}')
+                print(f'===biencoder recall@1=== {biencoder_recall}')
+                print(f'===biencoder f1-score=== {biencoder_f1}')
                 print("biencoder accuracy: %.4f" % biencoder_accuracy)
                 print("biencoder recall@%d: %.4f" % (top_k, y[-1]))
 
@@ -550,10 +582,14 @@ def run(
             print()
         else:
 
+            tp = 0
+            fp = 0
+            fn = 0
+            pred_entity_counter = 0
             scores = []
             predictions = []
-            for entity_list, index_list, scores_list in zip(
-                nns, index_array, unsorted_scores
+            for pred_entity_list, index_list, scores_list, gold_entity in zip(
+                nns, index_array, unsorted_scores, labels
             ):
 
                 index_list = index_list.tolist()
@@ -561,15 +597,32 @@ def run(
                 # descending order
                 index_list.reverse()
 
+                ### compute confusion matrix
+                pred_entity = pred_entity_list[index_list[0]]
+                pred_entity_counter += 1 
+                if pred_entity == gold_entity:
+                    tp += 1
+                else:
+                    fp += 1
+                    fn += 1
+
                 sample_prediction = []
                 sample_scores = []
                 for index in index_list:
-                    e_id = entity_list[index]
+                    e_id = pred_entity_list[index]
                     e_title = id2title[e_id]
                     sample_prediction.append(e_title)
                     sample_scores.append(scores_list[index])
                 predictions.append(sample_prediction)
                 scores.append(sample_scores)
+            
+            crossencoder_precision = tp/(tp+fp)
+            crossencoder_recall = tp/(tp+fn)
+            crossencoder_f1 = (2*crossencoder_precision*crossencoder_recall)/(crossencoder_precision+crossencoder_recall)
+            print(f'===Number of predicted entity=== {pred_entity_counter}')
+            print(f'===crosssencoder precision=== {crossencoder_precision}')
+            print(f'===crosssencoder recall@1=== {crossencoder_recall}')
+            print(f'===crosssencoder f1-score=== {crossencoder_f1}')
 
             crossencoder_normalized_accuracy = -1
             overall_unormalized_accuracy = -1
@@ -595,6 +648,13 @@ def run(
                 len(samples),
                 predictions,
                 scores,
+                biencoder_precision,
+                biencoder_recall,
+                biencoder_f1,
+                crossencoder_precision,
+                crossencoder_recall,
+                crossencoder_f1,
+                pred_entity_counter
             )
 
 

@@ -18,7 +18,7 @@ from pytorch_transformers.tokenization_bert import BertTokenizer
 
 from blink.biencoder.biencoder import BiEncoderRanker
 import blink.biencoder.data_process as data
-import blink.biencoder.nn_prediction as nnquery
+import blink.biencoder.nn_predictionv2 as nnquery
 import blink.candidate_ranking.utils as utils
 from blink.biencoder.zeshel_utils import WORLDS, load_entity_dict_zeshel, Stats
 from blink.common.params import BlinkParser
@@ -187,7 +187,7 @@ def load_or_generate_candidate_pool(
         # compute candidate pool from entity list
         entity_desc_list = load_entity_dict(logger, params, is_zeshel)
         candidate_pool = get_candidate_pool_tensor_helper(
-            entity_desc_list,
+            entity_desc_list, ### a dictionary of world: list_of_cand_pool for zeshel and a list for non-zeshel
             tokenizer,
             params["max_cand_length"],
             logger,
@@ -219,7 +219,7 @@ def main(params):
     # candidate encoding is not pre-computed. 
     # load/generate candidate pool to compute candidate encoding.
     cand_pool_path = params.get("cand_pool_path", None)
-    candidate_pool = load_or_generate_candidate_pool(
+    candidate_pool = load_or_generate_candidate_pool( ### LongTensor of encoded title-description
         tokenizer,
         params,
         logger,
@@ -237,7 +237,7 @@ def main(params):
             logger.info("Loading failed. Generating candidate encoding.")
 
     if candidate_encoding is None:
-        candidate_encoding = encode_candidate(
+        candidate_encoding = encode_candidate( ### embedding of candidates
             reranker,
             candidate_pool,
             params["encode_batch_size"],
