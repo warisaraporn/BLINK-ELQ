@@ -139,7 +139,6 @@ raw_data = [
 ]
 
 ### get number of total entity in dataset
-### spans, entity_mentions, entity, entity_name
 num_raw_data_entity = []
 for dt in raw_data:
     data = [json.loads(line) for line in open(dt, 'r', encoding='utf-8')]

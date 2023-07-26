@@ -283,7 +283,8 @@ def _run_biencoder(
         with torch.no_grad():
             context_outs = biencoder.encode_context(
                 context_input, num_cand_mentions=num_cand_mentions, topK_threshold=threshold,
-                gold_mention_bounds=mention_idxs, gold_mention_bounds_mask=mention_idx_mask , get_mention_scores=True ### add gold mention boundary
+                ### add gold mention boundary
+                gold_mention_bounds=mention_idxs, gold_mention_bounds_mask=mention_idx_mask , get_mention_scores=True
             )
 
             embedding_ctxt = context_outs['mention_reps'] ### torch.FloatTensor (bsz, max_num_pred_mentions, embed_dim): mention embeddings

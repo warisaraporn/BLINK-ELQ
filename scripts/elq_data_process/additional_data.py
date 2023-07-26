@@ -5,6 +5,7 @@ from tqdm import tqdm
 from transformers import BertTokenizerFast
 tokenizer = BertTokenizerFast.from_pretrained("bert-large-uncased")
 
+### convert ACE2004, AQUAINT, CLUEWEB, MSNBC, Wikipedia data into the format of the ELQ model
 def prepare_additional_data(input_filepath, output_filepath):
     id2title = json.load(open('/workspace/BLINK/models/id2title.json')) ### dictionary of id: title
     title_list = list(id2title.values()) ### title
@@ -30,9 +31,9 @@ def prepare_additional_data(input_filepath, output_filepath):
             offset_mapping_start = [s for s,_ in tokenized_text_ids['offset_mapping']]
             offset_mapping_end = [e for _,e in tokenized_text_ids['offset_mapping']]
 
-            ### check whether entity is in ELQ KB, if not then pass
             for mention in d['mentions']:
                 all_entity_count += 1
+                ### check whether entity is in ELQ KB, if not then pass
                 if mention['wiki_name'] in title_list:
                     try:
                         tokenized_mention_idx = [offset_mapping_start.index(mention['start']), offset_mapping_end.index(mention['start'] + mention['length'])+1]

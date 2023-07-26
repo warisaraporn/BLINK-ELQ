@@ -4,6 +4,7 @@ from tqdm import tqdm
 from transformers import BertTokenizerFast
 tokenizer = BertTokenizerFast.from_pretrained("bert-large-uncased")
 
+### convert webQSP, graphQ data into the format of the ELQ model
 def prepare_q(input_filepath, output_filepath):
     id2title = json.load(open('/workspace/BLINK/models/id2title.json')) ### dictionary of id: title
     title_list = list(id2title.values()) ### title
@@ -21,9 +22,9 @@ def prepare_q(input_filepath, output_filepath):
             tokenized_mention_idxs = []
             label_id = []
             description = []
-            ### check whether entity is in ELQ KB, if not then pass
             for i in range(len(d['entity'])):
                 all_entity_count += 1
+                ### check whether entity is in ELQ KB, if not then pass
                 if d['entity'][i] in title_list:
                     try:
                         ### tokenize text

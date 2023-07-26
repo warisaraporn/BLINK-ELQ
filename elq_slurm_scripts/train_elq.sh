@@ -32,14 +32,11 @@ then
 fi
 
 ### path to save finetuned model
-model_dir="experiments/${data_type}/${mention_agg_type}_${context_length}_${load_saved_cand_encs}_${adversarial}_bert_${model_size}_${mention_scoring_method}"
+model_dir="elq_ft_models/${data_type}/${mention_agg_type}_${context_length}_${load_saved_cand_encs}_${adversarial}_bert_${model_size}_${mention_scoring_method}"
 if [ $objective = "finetune" ] && [ ! -d "${model_dir}/epoch_0" ]
 then
-    mkdir -p ${model_dir}
-    base_model_dir="experiments/${base_data_type}/${mention_agg_type}_${context_length}_${load_saved_cand_encs}_${adversarial}_bert_${model_size}_${mention_scoring_method}"
-    # cp -rf ${base_model_dir}/epoch_${base_epoch} ${model_dir}/epoch_0
-    # rm ${model_dir}/epoch_0/training_state.th
-    # epoch=0
+    mkdir -p ${model_dir}    
+    ### set epoch=-1 to use ELQ pretrained wikipedia as a base model to finetune on custom dataset
     epoch=-1
 fi
 

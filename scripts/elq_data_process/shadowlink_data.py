@@ -4,7 +4,7 @@ from tqdm import tqdm
 from transformers import BertTokenizerFast
 tokenizer = BertTokenizerFast.from_pretrained("bert-large-uncased")
 
-
+### convert shadowlink data into the format of the ELQ model
 def preprare_shadow(input_filepath, output_filepath):
     id2title = json.load(open('/workspace/BLINK/models/id2title.json')) ### dictionary of id: title
     title_list = list(id2title.values()) ### title
