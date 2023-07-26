@@ -16,7 +16,7 @@ from colorama import init
 from termcolor import colored
 import torch.nn.functional as F
 
-import blink.ner as NER
+# import blink.ner as NER
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
 from elq.biencoder.biencoder import BiEncoderRanker, load_biencoder, to_bert_input
 from elq.biencoder.data_process import (
@@ -277,15 +277,22 @@ def _run_biencoder(
     label_ids = None
     for step, batch in enumerate(tqdm(dataloader)):
         context_input = batch[0].to(device)
+        mention_idxs = batch[-2].to(device)
+        mention_idx_mask = batch[-1].to(device)
         mask_ctxt = context_input != biencoder.NULL_IDX
         with torch.no_grad():
             context_outs = biencoder.encode_context(
                 context_input, num_cand_mentions=num_cand_mentions, topK_threshold=threshold,
+                gold_mention_bounds=mention_idxs, gold_mention_bounds_mask=mention_idx_mask , get_mention_scores=True ### add gold mention boundary
             )
-            embedding_ctxt = context_outs['mention_reps']
-            left_align_mask = context_outs['mention_masks']
-            chosen_mention_logits = context_outs['mention_logits']
-            chosen_mention_bounds = context_outs['mention_bounds']
+
+            embedding_ctxt = context_outs['mention_reps'] ### torch.FloatTensor (bsz, max_num_pred_mentions, embed_dim): mention embeddings
+            left_align_mask = context_outs['mention_masks'] ### torch.BoolTensor (bsz, max_num_pred_mentions): mention padding mask
+            chosen_mention_bounds = context_outs['mention_bounds'] ### torch.LongTensor (bsz, max_num_pred_mentions, 2)
+            # chosen_mention_logits = context_outs['mention_logits'] ### torch.FloatTensor (bsz, max_num_pred_mentions): mention scores/logits
+
+            ### assign mention score of gold mention to 100
+            chosen_mention_logits = torch.where(left_align_mask, torch.tensor(100, dtype=torch.float32), torch.tensor(float('-inf'), dtype=torch.float32))
 
             '''
             GET TOP CANDIDATES PER MENTION
@@ -433,6 +440,7 @@ def get_predictions(
                 # THRESHOLDING
                 assert utterance is not None
                 top_mentions_mask = (distances[:,0] > threshold)
+                under_threshold = (distances[:,0] < threshold)
             elif args.threshold_type == "top_entity_by_mention":
                 top_mentions_mask = (mention_scores[i] > mention_threshold)
             elif args.threshold_type == "thresholded_entity_by_mention":
@@ -558,13 +566,39 @@ def get_predictions(
                 f.write(
                     json.dumps(entity_results) + "\n"
                 )
+
+    ### compute confusion matrix
+    pred_entity_count = 0
+    gold_entity_count = 0
+    tp = 0
+    fp = 0
+    fn = 0
+    for line in all_entity_preds:
+        each_sample_pred = [pred for pred in line['pred_triples']]
+        each_sample_gold = [gold for gold in line['gold_triples']]
+        pred_entity_count += len(each_sample_pred)
+        gold_entity_count += len(each_sample_gold)
+
+        intersect = list(filter(lambda t: t in each_sample_pred, each_sample_gold))
+        tp += len(intersect)
+
+        fp += len([pred for pred in each_sample_pred if pred not in each_sample_gold])
+        fn += len([gold for gold in each_sample_gold if gold not in each_sample_pred])
+
+    print(f"****Number of predicted entity: {pred_entity_count}")
+    print(f"****Number of gold entity: {gold_entity_count}")
+
+    precision = tp/(tp+fp)
+    recall = tp/(tp+fn)
+    f1 = (2*precision*recall)/(precision+recall)
     
     if f is not None:
         f.close()
         errors_f.close()
     return (
         all_entity_preds, num_correct_weak, num_correct_strong, num_predicted, num_gold,
-        num_correct_weak_from_input_window, num_correct_strong_from_input_window, num_gold_from_input_window
+        num_correct_weak_from_input_window, num_correct_strong_from_input_window, num_gold_from_input_window,
+        gold_entity_count, tp, fp, fn, precision, recall, f1, under_threshold
     )
 
 
@@ -783,6 +817,7 @@ def run(
         (
             all_entity_preds, num_correct_weak, num_correct_strong, num_predicted, num_gold,
             num_correct_weak_from_input_window, num_correct_strong_from_input_window, num_gold_from_input_window,
+            gold_entity_count, tp, fp, fn, precision, recall, f1, under_threshold
         ) = get_predictions(
             args, dataloader, biencoder_params,
             samples, nns, dists, mention_scores, cand_scores,
@@ -792,20 +827,24 @@ def run(
 
         print("*--------*")
         if num_gold > 0:
-            print("WEAK MATCHING")
-            display_metrics(num_correct_weak, num_predicted, num_gold)
-            print("Just entities within input window...")
-            display_metrics(num_correct_weak_from_input_window, num_predicted, num_gold_from_input_window)
+            print(f'Precision: {precision}')
+            print(f'Recall: {recall}')
+            print(f'f1-score: {f1}')
             print("*--------*")
-            print("STRONG MATCHING")
-            display_metrics(num_correct_strong, num_predicted, num_gold)
-            print("Just entities within input window...")
-            display_metrics(num_correct_strong_from_input_window, num_predicted, num_gold_from_input_window)
-            print("*--------*")
-            print("biencoder runtime = {}".format(runtime))
-            print("*--------*")
+            # print("WEAK MATCHING")
+            # display_metrics(num_correct_weak, num_predicted, num_gold)
+            # print("Just entities within input window...")
+            # display_metrics(num_correct_weak_from_input_window, num_predicted, num_gold_from_input_window)
+            # print("*--------*")
+            # print("STRONG MATCHING")
+            # display_metrics(num_correct_strong, num_predicted, num_gold)
+            # print("Just entities within input window...")
+            # display_metrics(num_correct_strong_from_input_window, num_predicted, num_gold_from_input_window)
+            # print("*--------*")
+            # print("biencoder runtime = {}".format(runtime))
+            # print("*--------*")
 
-        return all_entity_preds
+        return all_entity_preds, gold_entity_count, tp, fp, fn, precision, recall, f1
 
 
 if __name__ == "__main__":
@@ -932,7 +971,7 @@ if __name__ == "__main__":
         "--output_path",
         dest="output_path",
         type=str,
-        default="output",
+        default="elq_output", ### change path of log.txt to elq_output folder
         help="Path to the output.",
     )
 

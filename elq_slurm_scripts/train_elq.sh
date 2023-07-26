@@ -30,14 +30,17 @@ if [ $objective = "finetune" ]
 then
     data_type="${data_type}_ft_${base_data_type}_${base_epoch}"
 fi
+
+### path to save finetuned model
 model_dir="experiments/${data_type}/${mention_agg_type}_${context_length}_${load_saved_cand_encs}_${adversarial}_bert_${model_size}_${mention_scoring_method}"
 if [ $objective = "finetune" ] && [ ! -d "${model_dir}/epoch_0" ]
 then
     mkdir -p ${model_dir}
     base_model_dir="experiments/${base_data_type}/${mention_agg_type}_${context_length}_${load_saved_cand_encs}_${adversarial}_bert_${model_size}_${mention_scoring_method}"
-    cp -rf ${base_model_dir}/epoch_${base_epoch} ${model_dir}/epoch_0
-    rm ${model_dir}/epoch_0/training_state.th
-    epoch=0
+    # cp -rf ${base_model_dir}/epoch_${base_epoch} ${model_dir}/epoch_0
+    # rm ${model_dir}/epoch_0/training_state.th
+    # epoch=0
+    epoch=-1
 fi
 
 # passed in a full file path at this point
@@ -154,7 +157,7 @@ then
     --last_epoch ${epoch} \
     ${all_mention_args} --data_parallel --get_losses ${distribute_train_samples_arg}"  #--debug  #
   echo $cmd
-  $cmd
+  CUDA_VISIBLE_DEVICES=6 $cmd
 fi
 
 
